@@ -4,7 +4,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain.agents import create_tool_calling_agent, AgentExecutor
-from tools import search_Tool
+from tools import search_Tool,wiki_tool
 
 load_dotenv()
 
@@ -33,7 +33,7 @@ prompt = ChatPromptTemplate.from_messages(
     ]
 ).partial(format_instructions=parser.get_format_instructions())
 
-tools = [search_Tool]
+tools = [search_Tool,wiki_tool]
 
 agent = create_tool_calling_agent(
     llm=llm,
