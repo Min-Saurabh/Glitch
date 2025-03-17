@@ -4,6 +4,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain.agents import create_tool_calling_agent, AgentExecutor
+from tools import search_Tool
 
 load_dotenv()
 
@@ -32,19 +33,22 @@ prompt = ChatPromptTemplate.from_messages(
     ]
 ).partial(format_instructions=parser.get_format_instructions())
 
+tools = [search_Tool]
+
 agent = create_tool_calling_agent(
     llm=llm,
     prompt=prompt,
-    tools=[]
+    tools=tools
 )
 
-agent_executor = AgentExecutor(agent=agent, tools=[], verbose=True)
-
-raw_Response = agent_executor.invoke({"query": "What is your name?"})
-print(raw_Response)
+agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+query = input("How can I help You? ")
+raw_Response = agent_executor.invoke({"query": query})
 
 try:
-    structured_response = parser.parse(raw_Response.get("output")[0]["text"])
+    # Extract the JSON string from the raw response
+    json_response = raw_Response["output"].strip().split("```json\n")[1].split("\n```")[0]
+    structured_response = parser.parse(json_response)
     print(structured_response)
 except Exception as e:
-    print("Error parsing response", e, "Raw Response - ", raw_Response)
+    print("Error parsing response:", e, "Raw Response - ", raw_Response)
