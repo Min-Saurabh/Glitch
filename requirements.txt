@@ -1,14 +1,6 @@
-<<<<<<< HEAD
 langchain 
 wikipedia 
 langchain-community 
 python-dotenv
 pydantic
-=======
-langchain 
-wikipedia 
-langchain-community 
-python-dotenv
-pydantic
->>>>>>> 18eeab31 (Initializes the directory)
 duckduckgo-search
