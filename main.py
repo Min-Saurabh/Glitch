@@ -47,28 +47,22 @@ query = input("How can I help you? ")
 raw_Response = agent_executor.invoke({"query": query})
 
 try:
-    # Extract the JSON string from the raw response
     output_text = raw_Response["output"].strip()
 
-    # Debugging: Print raw output to check format
     print("Raw Output:", output_text)
 
-    # Remove markdown-like formatting if present
     if output_text.startswith("```json"):
         json_response = output_text.replace("```json", "").replace("```", "").strip()
     else:
         json_response = output_text
 
-    # Convert JSON string to dictionary
-    json_data = json.loads(json_response)  # ✅ Convert string to dict before parsing
-    structured_response = ResearchResponse(**json_data)  # ✅ Properly parse the response
+    json_data = json.loads(json_response)
+    structured_response = ResearchResponse(**json_data)
 
     print("Structured Response:", structured_response)
 
-    # Debugging: Check if the tool was used
     print("Tools Used:", structured_response.tools_Used)
 
-    # Save to file if the tool was used
     if "save_text_to_file" in structured_response.tools_Used:
         print("Saving to file...")
         save_result = save_tool.func(structured_response.response)
