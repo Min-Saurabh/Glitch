@@ -1,15 +1,14 @@
 import os
 from langchain.tools import Tool
 
-def generate_filename(code: str) -> str:
+def generate_filename(code: str, language: str) -> str:
     # Extract the first few words or a specific identifier from the code
     lines = code.splitlines()
     function_name = "generated_code"  # Default name if no function is found
 
     for line in lines:
-        if line.strip().startswith("def "):
-            # Get the function name without the "def " prefix
-            function_name = line.split("(")[0][4:].strip()
+        if line.strip().startswith("def ") or line.strip().startswith("function "):
+            function_name = line.split("(")[0].split()[1].strip()  # Adjust for different languages
             break
 
     # Clean the function name to create a valid filename
@@ -19,10 +18,25 @@ def generate_filename(code: str) -> str:
     if function_name in ["__init__", "__str__", "__repr__"]:
         function_name = "custom_function"
 
-    return f"{function_name}_code.py"
+    # Define a mapping of languages to file extensions
+    extension_map = {
+        "python": "py",
+        "javascript": "js",
+        "java": "java",
+        "csharp": "cs",
+        "ruby": "rb",
+        "go": "go",
+        "php": "php",
+        # Add more languages as needed
+    }
 
-def save_to_txt(data: str):
-    filename = generate_filename(data)  # Generate a unique filename based on the code
+    # Get the file extension based on the language, default to 'txt' if not recognized
+    extension = extension_map.get(language.lower(), "txt")  # Default to .txt if language not recognized
+
+    return f"{function_name}_code.{extension}"
+
+def save_to_txt(data: str, language: str):
+    filename = generate_filename(data, language)  # Generate a unique filename based on the code and language
     try:
         formatted_text = f"# Generated Code\n\n{data}\n"
 
@@ -38,5 +52,5 @@ def save_to_txt(data: str):
 save_tool = Tool(
     name="save_code_to_file",
     func=save_to_txt,
-    description="Saves generated code to a Python file with a meaningful name.",
+    description="Saves generated code to a file with a meaningful name based on the programming language.",
 )
