@@ -6,13 +6,11 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain.agents import create_tool_calling_agent, AgentExecutor
 from tools import save_tool
-from language_selector import detect_language  # Import the language detection function
 
 load_dotenv()
 
 class CodeResponse(BaseModel):
     code: str
-    language: str  # New attribute for language
 
 llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash")  
 parser = PydanticOutputParser(pydantic_object=CodeResponse)
@@ -27,7 +25,7 @@ prompt = ChatPromptTemplate.from_messages(
             """,
         ),
         ("human", "{query}"),
-        ("placeholder", "{agent_scratchpad}"),
+        ("placeholder", "{agent_scratchpad}"),  #Placeholder for agent_scratchpad
     ]
 ).partial(format_instructions=parser.get_format_instructions())
 
@@ -40,7 +38,6 @@ agent = create_tool_calling_agent(
 agent_executor = AgentExecutor(agent=agent, tools=[save_tool], verbose=True)
 
 query = input("Enter your query: ")
-language = detect_language(query)  # Automatically detect the programming language
 raw_Response = agent_executor.invoke({"query": query})
 
 try:
@@ -55,7 +52,7 @@ try:
     structured_response = CodeResponse(**json_data)
 
     # Automatically save the generated code
-    save_result = save_tool.func(structured_response.code, language)  # Use detected language
+    save_result = save_tool.func(structured_response.code)
     print(save_result)
 
 except Exception as e:
