@@ -5,51 +5,43 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain.agents import create_tool_calling_agent, AgentExecutor
-from tools import search_Tool, wiki_tool, save_tool
+from tools import save_tool
 
 load_dotenv()
 
-class ResearchResponse(BaseModel):
-    topic: str
-    response: str
-    sources: list[str]
-    tools_Used: list[str]
+class CodeResponse(BaseModel):
+    code: str
 
 llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash")  
-parser = PydanticOutputParser(pydantic_object=ResearchResponse)
+parser = PydanticOutputParser(pydantic_object=CodeResponse)
 
 prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
             """
-            You are a research assistant that will help generate a research paper.
-            Answer the user query and use necessary tools. 
+            You are an AI code generator. Write the code based on the provided query and save it to a file automatically.
             Wrap the output in this format and provide no other text\n{format_instructions}
             """,
         ),
-        ("placeholder", "{chat_history}"),
         ("human", "{query}"),
-        ("placeholder", "{agent_scratchpad}"),
+        ("placeholder", "{agent_scratchpad}"),  #Placeholder for agent_scratchpad
     ]
 ).partial(format_instructions=parser.get_format_instructions())
-
-tools = [search_Tool, wiki_tool, save_tool]
 
 agent = create_tool_calling_agent(
     llm=llm,
     prompt=prompt,
-    tools=tools
+    tools=[save_tool]
 )
 
-agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
-query = input("How can I help you? ")
+agent_executor = AgentExecutor(agent=agent, tools=[save_tool], verbose=True)
+
+query = input("Enter your query: ")
 raw_Response = agent_executor.invoke({"query": query})
 
 try:
     output_text = raw_Response["output"].strip()
-
-    print("Raw Output:", output_text)
 
     if output_text.startswith("```json"):
         json_response = output_text.replace("```json", "").replace("```", "").strip()
@@ -57,18 +49,11 @@ try:
         json_response = output_text
 
     json_data = json.loads(json_response)
-    structured_response = ResearchResponse(**json_data)
+    structured_response = CodeResponse(**json_data)
 
-    print("Structured Response:", structured_response)
-
-    print("Tools Used:", structured_response.tools_Used)
-
-    if "save_text_to_file" in structured_response.tools_Used:
-        print("Saving to file...")
-        save_result = save_tool.func(structured_response.response)
-        print(save_result)
-    else:
-        print("Save tool was not invoked.")
+    # Automatically save the generated code
+    save_result = save_tool.func(structured_response.code)
+    print(save_result)
 
 except Exception as e:
     print("Error parsing response:", e, "Raw Response - ", raw_Response)
