@@ -11,8 +11,45 @@ load_dotenv()
 
 class CodeResponse(BaseModel):
     code: str
+    language: str
+    filename: str | None = None
 
-llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash")  
+LANGUAGE_EXTENSIONS = {
+    "python": ".py",
+    "javascript": ".js",
+    "typescript": ".ts",
+    "java": ".java",
+    "c": ".c",
+    "cpp": ".cpp",
+    "go": ".go",
+    "ruby": ".rb",
+    "php": ".php",
+    "bash": ".sh",
+    "shell": ".sh",
+    "html": ".html",
+    "css": ".css",
+    "json": ".json",
+    "xml": ".xml",
+    "sql": ".sql",
+}
+
+def save_code_to_file(code: str, language: str, filename: str | None = None) -> str:
+    ext = LANGUAGE_EXTENSIONS.get(language.lower())
+    if not ext:
+        raise ValueError(f"Unsupported language: {language}")
+
+    safe_filename = filename or "generated_code"
+    full_filename = f"{safe_filename}{ext}"
+
+    with open(full_filename, "w", encoding="utf-8") as f:
+        f.write(code)
+    
+    return f"✅ Code saved to `{full_filename}`"
+
+save_tool.func = save_code_to_file
+
+
+llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash")
 parser = PydanticOutputParser(pydantic_object=CodeResponse)
 
 prompt = ChatPromptTemplate.from_messages(
@@ -20,14 +57,83 @@ prompt = ChatPromptTemplate.from_messages(
         (
             "system",
             """
-            You are an AI code generator. Write the code based on the provided query and save it to a file automatically.
-            Wrap the output in this format and provide no other text\n{format_instructions}
+You are an AI developer assistant.
+
+Your task is to generate clean, complete, and functional code in the correct programming language based on a user's query.
+
+You must return your answer in **raw JSON** using this exact structure:
+{format_instructions}
+
+⚠️ STRICT RULES:
+- Return ONLY the JSON block — no markdown formatting, no explanation, no additional text.
+- Provide the correct language name (e.g., "python", "javascript", "cpp", "html").
+- Use descriptive but concise filenames where applicable (no extension needed).
+
+📚 EXAMPLES:
+
+1️⃣
+Query:
+Create a Python script that prints "Hello, World!"
+
+Response:
+{{
+  "code": "print('Hello, World!')",
+  "language": "python"
+}}
+
+2️⃣
+Query:
+Write a JavaScript function that sums an array
+
+Response:
+{{
+  "code": "function sumArray(arr) {{ return arr.reduce((a, b) => a + b, 0); }}",
+  "language": "javascript",
+  "filename": "sum_array"
+}}
+
+3️⃣
+Query:
+Generate an HTML page with a red button labeled 'Click Me'
+
+Response:
+{{
+  "code": "<!DOCTYPE html>\\n<html>\\n<head><title>Button Page</title></head>\\n<body>\\n  <button style='background:red; color:white;'>Click Me</button>\\n</body>\\n</html>",
+  "language": "html",
+  "filename": "button_page"
+}}
+
+4️⃣
+Query:
+Write a C++ program that adds two numbers from user input
+
+Response:
+{{
+  "code": "#include <iostream>\\nusing namespace std;\\n\\nint main() {{\\n  int a, b;\\n  cout << \\\"Enter two numbers: \\\";\\n  cin >> a >> b;\\n  cout << \\\"Sum: \\\" << (a + b) << endl;\\n  return 0;\\n}}",
+  "language": "cpp",
+  "filename": "sum_input"
+}}
+
+5️⃣
+Query:
+Write a shell script that lists all `.txt` files in a folder
+
+Response:
+{{
+  "code": "#!/bin/bash\\nls *.txt",
+  "language": "bash",
+  "filename": "list_txt_files"
+}}
+
+🚫 Do not wrap output in triple backticks (```) or markdown formatting.
+✅ Only return the raw JSON object as described above.
             """,
         ),
         ("human", "{query}"),
-        ("placeholder", "{agent_scratchpad}"),  #Placeholder for agent_scratchpad
+        ("placeholder", "{agent_scratchpad}"),
     ]
 ).partial(format_instructions=parser.get_format_instructions())
+
 
 agent = create_tool_calling_agent(
     llm=llm,
@@ -37,23 +143,29 @@ agent = create_tool_calling_agent(
 
 agent_executor = AgentExecutor(agent=agent, tools=[save_tool], verbose=True)
 
-query = input("Enter your query: ")
-raw_Response = agent_executor.invoke({"query": query})
+if __name__ == "__main__":
+    query = input("Enter your query 😎 : ")
+    raw_response = agent_executor.invoke({"query": query})
 
-try:
-    output_text = raw_Response["output"].strip()
+    try:
+        output_text = raw_response["output"].strip()
 
-    if output_text.startswith("```json"):
-        json_response = output_text.replace("```json", "").replace("```", "").strip()
-    else:
-        json_response = output_text
+        if output_text.startswith("```json"):
+            json_response = output_text.replace("```json", "").replace("```", "").strip()
+        else:
+            json_response = output_text
 
-    json_data = json.loads(json_response)
-    structured_response = CodeResponse(**json_data)
+        json_data = json.loads(json_response)
+        structured_response = CodeResponse(**json_data)
 
-    # Automatically save the generated code
-    save_result = save_tool.func(structured_response.code)
-    print(save_result)
+        save_result = save_code_to_file(
+            structured_response.code,
+            structured_response.language,
+            structured_response.filename
+        )
 
-except Exception as e:
-    print("Error parsing response:", e, "Raw Response - ", raw_Response)
+        print(save_result)
+
+    except Exception as e:
+        print("❌ Error parsing response:", e)
+        print("Raw Response:", raw_response)

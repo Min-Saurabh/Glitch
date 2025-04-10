@@ -24,7 +24,7 @@ def generate_filename(code: str) -> str:
 def save_to_txt(data: str):
     filename = generate_filename(data)  # Generate a unique filename based on the code
     try:
-        formatted_text = f"# Generated Code\n\n{data}\n"
+        formatted_text = f"\n\n{data}\n"
 
         with open(filename, "a", encoding="utf-8") as f:
             f.write(formatted_text)
