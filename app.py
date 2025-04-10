@@ -1,10 +1,10 @@
 import streamlit as st
-from main import agent_executor, CodeResponse, save_code_to_file
+from main import get_llm, get_agent_executor, CodeResponse, save_code_to_file
 import json
 
 st.set_page_config(page_title="🚀 Modern AI Code Generator", layout="centered")
 
-# Custom CSS for styling
+# Custom CSS
 st.markdown("""
     <style>
         body {
@@ -29,16 +29,35 @@ st.markdown("""
 st.markdown('<div class="big-title">🚀 AI Code Generator</div>', unsafe_allow_html=True)
 st.markdown("#### Generate clean, functional code using powerful AI. Just describe what you want!")
 
-# Input Section
-with st.container():
-    query = st.text_area("📝 Your prompt", placeholder="e.g. Write a Python script that greets the user 👋", height=150)
-    generate = st.button("⚡ Generate Code")
+# Session state init
+if "code_count" not in st.session_state:
+    st.session_state.code_count = 0
+if "user_api_key" not in st.session_state:
+    st.session_state.user_api_key = ""
 
-# Output Section
+# Input
+query = st.text_area("📝 Your prompt", placeholder="e.g. Write a Python script that greets the user 👋", height=150)
+
+# Show free usage info
+if st.session_state.code_count < 3:
+    st.info(f"🎉 You have {3 - st.session_state.code_count} free generations left.")
+elif not st.session_state.user_api_key:
+    st.warning("⚠️ Free limit reached. Please provide your own Gemini API key to continue.")
+    st.session_state.user_api_key = st.text_input("🔑 Enter your Gemini API Key", type="password")
+
+generate = st.button("⚡ Generate Code")
+
+# Main logic
 if generate:
-    if query.strip():
+    if not query.strip():
+        st.warning("⛔ Please enter a prompt before generating.")
+    elif st.session_state.code_count >= 3 and not st.session_state.user_api_key:
+        st.error("❌ API key required to continue.")
+    else:
         with st.spinner("Generating code..."):
             try:
+                llm = get_llm(st.session_state.user_api_key)
+                agent_executor = get_agent_executor(llm)
                 raw_response = agent_executor.invoke({"query": query})
                 output = raw_response["output"].strip()
 
@@ -49,27 +68,19 @@ if generate:
                 response = CodeResponse(**json_data)
 
                 st.success("✅ Code generated successfully!")
-
-                # Code Display
                 st.markdown("### 🧠 Generated Code")
                 st.code(response.code, language=response.language)
-
-                # Save and download
-                saved_file = save_code_to_file(
-                    response.code, response.language, response.filename
-                )
 
                 filename = f"{response.filename or 'generated_code'}.{response.language}"
                 st.download_button("⬇️ Download Code", response.code, file_name=filename, mime="text/plain")
 
-                st.info(saved_file)
+                st.info(save_code_to_file(response.code, response.language, response.filename))
+                st.session_state.code_count += 1
 
             except Exception as e:
                 st.error("❌ Something went wrong while parsing or generating the response.")
                 st.text_area("⚠️ Raw Output (for debugging)", output if 'output' in locals() else "")
                 st.exception(e)
-    else:
-        st.warning("⛔ Please enter a prompt before generating.")
 
 # Footer
 st.markdown('<div class="footer">💡 Tip: You can describe code in natural language — the AI does the rest!</div>', unsafe_allow_html=True)
