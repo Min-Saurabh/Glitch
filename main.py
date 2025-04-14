@@ -49,13 +49,11 @@ def save_code_to_file(code: str, language: str, filename: str | None = None) -> 
 
 save_tool.func = save_code_to_file
 
-
 def get_llm(user_key: str | None = None):
     key = user_key or os.getenv("GOOGLE_API_KEY")
     if not key:
         raise ValueError("No Gemini API key found.")
     return ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=key)
-
 
 def get_agent_executor(llm):
     parser = PydanticOutputParser(pydantic_object=CodeResponse)
@@ -141,18 +139,18 @@ def get_agent_executor(llm):
             ("placeholder", "{agent_scratchpad}"),
         ]
     ).partial(format_instructions=parser.get_format_instructions())
+
     agent = create_tool_calling_agent(llm=llm, prompt=prompt, tools=[save_tool])
     return AgentExecutor(agent=agent, tools=[save_tool], verbose=True)
 
-
-
-
-
 if __name__ == "__main__":
     query = input("Enter your query 😎 : ")
-    raw_response = get_agent_executor.invoke({"query": query})
 
     try:
+        llm = get_llm()
+        agent_executor = get_agent_executor(llm)
+        raw_response = agent_executor.invoke({"query": query})
+
         output_text = raw_response["output"].strip()
 
         if output_text.startswith("```json"):
@@ -173,4 +171,4 @@ if __name__ == "__main__":
 
     except Exception as e:
         print("❌ Error parsing response:", e)
-        print("Raw Response:", raw_response)
+        print("Raw Response:", raw_response if 'raw_response' in locals() else "No response received")
